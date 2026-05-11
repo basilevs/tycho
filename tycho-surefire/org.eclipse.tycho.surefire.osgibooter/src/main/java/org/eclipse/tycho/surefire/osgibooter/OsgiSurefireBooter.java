@@ -71,7 +71,9 @@ import org.apache.maven.surefire.booter.ProviderFactory;
 import org.apache.maven.surefire.booter.StartupConfiguration;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.osgi.service.datalocation.Location;
 import org.eclipse.osgi.service.resolver.ResolverError;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -139,12 +141,11 @@ public class OsgiSurefireBooter {
                     File file = fileFromFileUri(new URI(location));
                     if (!file.isAbsolute()) {
                         // Relative paths in Equinox bundle locations are relative to the install area
-                        Bundle osgiBooterBundle = FrameworkUtil.getBundle(OsgiSurefireBooter.class);
-                        BundleContext ctx = osgiBooterBundle != null ? osgiBooterBundle.getBundleContext() : null;
-                        if (ctx != null) {
-                            String installArea = ctx.getProperty("osgi.install.area");
-                            if (installArea != null) {
-                                File installDir = fileFromFileUri(new URI(installArea));
+                        Location installLocation = Platform.getInstallLocation();
+                        if (installLocation != null) {
+                            URL installUrl = installLocation.getURL();
+                            if (installUrl != null) {
+                                File installDir = fileFromFileUri(installUrl.toURI());
                                 file = new File(installDir, file.getPath());
                             }
                         }
