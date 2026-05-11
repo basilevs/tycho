@@ -72,6 +72,7 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.osgi.service.resolver.ResolverError;
 import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
 import org.osgi.framework.FrameworkUtil;
@@ -121,12 +122,29 @@ public class OsgiSurefireBooter {
         File adapt = bundle.adapt(File.class);
         if (adapt == null) {
             String location = bundle.getLocation();
+            String filePath = null;
             String prefix = "initial@reference:file:";
+            String prefix2 = "reference:file:";
             if (location.startsWith(prefix)) {
-                File file = new File(location.substring(prefix.length()));
+                filePath = location.substring(prefix.length());
+            } else if (location.startsWith(prefix2)) {
+                filePath = location.substring(prefix2.length());
+            }
+            if (filePath != null) {
+                File file = new File(filePath);
+                if (!file.isAbsolute()) {
+                    // Relative paths in Equinox bundle locations are relative to the install area
+                    BundleContext ctx = FrameworkUtil.getBundle(OsgiSurefireBooter.class).getBundleContext();
+                    if (ctx != null) {
+                        String installArea = ctx.getProperty("osgi.install.area");
+                        if (installArea != null && installArea.startsWith("file:")) {
+                            File installDir = new File(installArea.substring("file:".length()));
+                            file = new File(installDir, filePath);
+                        }
+                    }
+                }
                 try {
-                    URL url = file.getCanonicalFile().toURI().toURL();
-                    return url;
+                    return file.getCanonicalFile().toURI().toURL();
                 } catch (IOException e) {
                     return file.toURI().toURL();
                 }
