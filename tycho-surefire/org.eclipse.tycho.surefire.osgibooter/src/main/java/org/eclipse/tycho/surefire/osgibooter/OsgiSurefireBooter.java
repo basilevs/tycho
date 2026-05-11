@@ -123,23 +123,28 @@ public class OsgiSurefireBooter {
         if (adapt == null) {
             String location = bundle.getLocation();
             String filePath = null;
-            String prefix = "initial@reference:file:";
-            String prefix2 = "reference:file:";
-            if (location.startsWith(prefix)) {
-                filePath = location.substring(prefix.length());
-            } else if (location.startsWith(prefix2)) {
-                filePath = location.substring(prefix2.length());
+            String initialReferencePrefix = "initial@reference:file:";
+            String referencePrefix = "reference:file:";
+            if (location.startsWith(initialReferencePrefix)) {
+                filePath = location.substring(initialReferencePrefix.length());
+            } else if (location.startsWith(referencePrefix)) {
+                filePath = location.substring(referencePrefix.length());
             }
             if (filePath != null) {
                 File file = new File(filePath);
                 if (!file.isAbsolute()) {
                     // Relative paths in Equinox bundle locations are relative to the install area
-                    BundleContext ctx = FrameworkUtil.getBundle(OsgiSurefireBooter.class).getBundleContext();
+                    Bundle osgiBooterBundle = FrameworkUtil.getBundle(OsgiSurefireBooter.class);
+                    BundleContext ctx = osgiBooterBundle != null ? osgiBooterBundle.getBundleContext() : null;
                     if (ctx != null) {
                         String installArea = ctx.getProperty("osgi.install.area");
-                        if (installArea != null && installArea.startsWith("file:")) {
-                            File installDir = new File(installArea.substring("file:".length()));
-                            file = new File(installDir, filePath);
+                        if (installArea != null) {
+                            try {
+                                File installDir = new File(new java.net.URI(installArea));
+                                file = new File(installDir, filePath);
+                            } catch (java.net.URISyntaxException e) {
+                                // fallback to resolving against working directory
+                            }
                         }
                     }
                 }
