@@ -76,7 +76,6 @@ import org.eclipse.core.runtime.Status;
 import org.eclipse.osgi.service.datalocation.Location;
 import org.eclipse.osgi.service.resolver.ResolverError;
 import org.osgi.framework.Bundle;
-import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
 import org.osgi.framework.FrameworkUtil;
@@ -126,15 +125,11 @@ public class OsgiSurefireBooter {
         File adapt = bundle.adapt(File.class);
         if (adapt == null) {
             String location = bundle.getLocation();
-            // Strip Equinox-specific prefixes to get to the file URI.
-            // These are Equinox protocol decorators, not part of the URI itself.
-            String initialPrefix = "initial@";
-            if (location.startsWith(initialPrefix)) {
-                location = location.substring(initialPrefix.length());
-            }
-            String referencePrefix = "reference:";
-            if (location.startsWith(referencePrefix)) {
-                location = location.substring(referencePrefix.length());
+            // Strip Equinox-specific prefix to get to the file URI.
+            // "initial@reference:" is an Equinox protocol decorator, not part of the URI itself.
+            String equinoxPrefix = "initial@reference:";
+            if (location.startsWith(equinoxPrefix)) {
+                location = location.substring(equinoxPrefix.length());
             }
             if (location.startsWith("file:")) {
                 try {
@@ -142,13 +137,17 @@ public class OsgiSurefireBooter {
                     if (!file.isAbsolute()) {
                         // Relative paths in Equinox bundle locations are relative to the install area
                         Location installLocation = Platform.getInstallLocation();
-                        if (installLocation != null) {
-                            URL installUrl = installLocation.getURL();
-                            if (installUrl != null) {
-                                File installDir = fileFromFileUri(installUrl.toURI());
-                                file = new File(installDir, file.getPath());
-                            }
+                        if (installLocation == null) {
+                            throw new IllegalStateException(
+                                    "Cannot resolve relative bundle path: install location is not set");
                         }
+                        URL installUrl = installLocation.getURL();
+                        if (installUrl == null) {
+                            throw new IllegalStateException(
+                                    "Cannot resolve relative bundle path: install location URL is not available");
+                        }
+                        File installDir = fileFromFileUri(installUrl.toURI());
+                        file = new File(installDir, file.getPath());
                     }
                     try {
                         return file.getCanonicalFile().toURI().toURL();
