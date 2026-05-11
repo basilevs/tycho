@@ -23,6 +23,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
@@ -134,7 +136,7 @@ public class OsgiSurefireBooter {
             }
             if (location.startsWith("file:")) {
                 try {
-                    File file = fileFromFileUri(new java.net.URI(location));
+                    File file = fileFromFileUri(new URI(location));
                     if (!file.isAbsolute()) {
                         // Relative paths in Equinox bundle locations are relative to the install area
                         Bundle osgiBooterBundle = FrameworkUtil.getBundle(OsgiSurefireBooter.class);
@@ -142,7 +144,7 @@ public class OsgiSurefireBooter {
                         if (ctx != null) {
                             String installArea = ctx.getProperty("osgi.install.area");
                             if (installArea != null) {
-                                File installDir = fileFromFileUri(new java.net.URI(installArea));
+                                File installDir = fileFromFileUri(new URI(installArea));
                                 file = new File(installDir, file.getPath());
                             }
                         }
@@ -152,7 +154,7 @@ public class OsgiSurefireBooter {
                     } catch (IOException e) {
                         return file.toURI().toURL();
                     }
-                } catch (java.net.URISyntaxException e) {
+                } catch (URISyntaxException e) {
                     throw new IllegalStateException("Invalid bundle location URI: " + location, e);
                 }
             }
@@ -166,7 +168,7 @@ public class OsgiSurefireBooter {
      * {@code file:/path} or {@code file:///C:/path}) and Equinox-style opaque file URIs (e.g.
      * {@code file:path} or {@code file:C:/path}).
      */
-    private static File fileFromFileUri(java.net.URI fileUri) {
+    private static File fileFromFileUri(URI fileUri) {
         // Equinox generates non-standard file URIs (e.g. file:path without //).
         // Use getSchemeSpecificPart() for opaque URIs, getPath() for hierarchical.
         String path = fileUri.isOpaque() ? fileUri.getSchemeSpecificPart() : fileUri.getPath();
