@@ -122,41 +122,55 @@ public class OsgiSurefireBooter {
         File adapt = bundle.adapt(File.class);
         if (adapt == null) {
             String location = bundle.getLocation();
-            String filePath = null;
-            String initialReferencePrefix = "initial@reference:file:";
-            String referencePrefix = "reference:file:";
-            if (location.startsWith(initialReferencePrefix)) {
-                filePath = location.substring(initialReferencePrefix.length());
-            } else if (location.startsWith(referencePrefix)) {
-                filePath = location.substring(referencePrefix.length());
+            // Strip Equinox-specific prefixes to get to the file URI.
+            // These are Equinox protocol decorators, not part of the URI itself.
+            String initialPrefix = "initial@";
+            if (location.startsWith(initialPrefix)) {
+                location = location.substring(initialPrefix.length());
             }
-            if (filePath != null) {
-                File file = new File(filePath);
-                if (!file.isAbsolute()) {
-                    // Relative paths in Equinox bundle locations are relative to the install area
-                    Bundle osgiBooterBundle = FrameworkUtil.getBundle(OsgiSurefireBooter.class);
-                    BundleContext ctx = osgiBooterBundle != null ? osgiBooterBundle.getBundleContext() : null;
-                    if (ctx != null) {
-                        String installArea = ctx.getProperty("osgi.install.area");
-                        if (installArea != null) {
-                            try {
-                                File installDir = new File(new java.net.URI(installArea));
-                                file = new File(installDir, filePath);
-                            } catch (java.net.URISyntaxException e) {
-                                // fallback to resolving against working directory
+            String referencePrefix = "reference:";
+            if (location.startsWith(referencePrefix)) {
+                location = location.substring(referencePrefix.length());
+            }
+            if (location.startsWith("file:")) {
+                try {
+                    File file = fileFromFileUri(new java.net.URI(location));
+                    if (!file.isAbsolute()) {
+                        // Relative paths in Equinox bundle locations are relative to the install area
+                        Bundle osgiBooterBundle = FrameworkUtil.getBundle(OsgiSurefireBooter.class);
+                        BundleContext ctx = osgiBooterBundle != null ? osgiBooterBundle.getBundleContext() : null;
+                        if (ctx != null) {
+                            String installArea = ctx.getProperty("osgi.install.area");
+                            if (installArea != null) {
+                                File installDir = fileFromFileUri(new java.net.URI(installArea));
+                                file = new File(installDir, file.getPath());
                             }
                         }
                     }
-                }
-                try {
-                    return file.getCanonicalFile().toURI().toURL();
-                } catch (IOException e) {
-                    return file.toURI().toURL();
+                    try {
+                        return file.getCanonicalFile().toURI().toURL();
+                    } catch (IOException e) {
+                        return file.toURI().toURL();
+                    }
+                } catch (java.net.URISyntaxException e) {
+                    throw new IllegalStateException("Invalid bundle location URI: " + location, e);
                 }
             }
             throw new IllegalStateException("Can't adapt bundle to file: " + bundle);
         }
         return adapt.toURI().toURL();
+    }
+
+    /**
+     * Converts a file URI to a {@link File}. Handles both standard hierarchical file URIs (e.g.
+     * {@code file:/path} or {@code file:///C:/path}) and Equinox-style opaque file URIs (e.g.
+     * {@code file:path} or {@code file:C:/path}).
+     */
+    private static File fileFromFileUri(java.net.URI fileUri) {
+        // Equinox generates non-standard file URIs (e.g. file:path without //).
+        // Use getSchemeSpecificPart() for opaque URIs, getPath() for hierarchical.
+        String path = fileUri.isOpaque() ? fileUri.getSchemeSpecificPart() : fileUri.getPath();
+        return new File(path);
     }
 
     public static int invokeSureFire(String[] args, Properties testProps) throws Exception {
