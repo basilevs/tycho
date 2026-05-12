@@ -21,6 +21,7 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -38,6 +39,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.maven.plugin.failsafe.util.FailsafeSummaryXmlUtils;
 import org.apache.maven.plugin.surefire.StartupReportConfiguration;
@@ -68,6 +70,7 @@ import org.apache.maven.surefire.booter.PropertiesWrapper;
 import org.apache.maven.surefire.booter.ProviderConfiguration;
 import org.apache.maven.surefire.booter.ProviderFactory;
 import org.apache.maven.surefire.booter.StartupConfiguration;
+import org.apache.maven.surefire.shared.lang3.exception.ExceptionUtils;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Platform;
@@ -117,7 +120,15 @@ public class OsgiSurefireBooter {
             Class<?> bootLoaded = classLoader.loadClass(OsgiSurefireBooter.class.getName());
             Method method = bootLoaded.getMethod("invokeSureFire", String[].class, Properties.class);
             return (Integer) method.invoke(null, args, testProps);
+        } catch (InvocationTargetException e) {
+            Throwable cnfe = ExceptionUtils.getRootCause(e);
+            if (cnfe instanceof ClassNotFoundException) {
+                String message = "Classpath:\n" + urls.stream().map(URL::toString).collect(Collectors.joining("\n"));
+                throw new ClassNotFoundException(message, e);
+            }
+            throw e;
         }
+
     }
 
     private static URL getURL(Bundle bundle) throws MalformedURLException {
