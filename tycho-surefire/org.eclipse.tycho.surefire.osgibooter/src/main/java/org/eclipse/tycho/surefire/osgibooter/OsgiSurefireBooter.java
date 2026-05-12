@@ -23,7 +23,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -125,37 +124,19 @@ public class OsgiSurefireBooter {
         File adapt = bundle.adapt(File.class);
         if (adapt == null) {
             String location = bundle.getLocation();
-            // Strip Equinox-specific prefix to get to the file URI.
-            // "initial@reference:" is an Equinox protocol decorator, not part of the URI itself.
-            String equinoxPrefix = "initial@reference:";
-            if (location.startsWith(equinoxPrefix)) {
-                location = location.substring(equinoxPrefix.length());
-            }
-            if (location.startsWith("file:")) {
+            // Example: initial@reference:file:../../fresh_local_repo/org/eclipse/tycho/org.eclipse.tycho.surefire.osgibooter/6.0.0-SNAPSHOT/org.eclipse.tycho.surefire.osgibooter-6.0.0-SNAPSHOT.jar
+            String prefix = "initial@reference:file:";
+            if (location.startsWith(prefix)) {
+                File file = new File(location.substring(prefix.length()));
                 try {
-                    File file = fileFromFileUri(new URI(location));
                     if (!file.isAbsolute()) {
                         // Relative paths in Equinox bundle locations are relative to the install area
-                        Location installLocation = Platform.getInstallLocation();
-                        if (installLocation == null) {
-                            throw new IllegalStateException(
-                                    "Cannot resolve relative bundle path: install location is not set");
-                        }
-                        URL installUrl = installLocation.getURL();
-                        if (installUrl == null) {
-                            throw new IllegalStateException(
-                                    "Cannot resolve relative bundle path: install location URL is not available");
-                        }
-                        File installDir = fileFromFileUri(installUrl.toURI());
-                        file = new File(installDir, file.getPath());
+                        file = new File(getInstallLocation(), file.getPath());
                     }
-                    try {
-                        return file.getCanonicalFile().toURI().toURL();
-                    } catch (IOException e) {
-                        return file.toURI().toURL();
-                    }
-                } catch (URISyntaxException e) {
-                    throw new IllegalStateException("Invalid bundle location URI: " + location, e);
+                    URL url = file.getCanonicalFile().toURI().toURL();
+                    return url;
+                } catch (IOException e) {
+                    return file.toURI().toURL();
                 }
             }
             throw new IllegalStateException("Can't adapt bundle to file: " + bundle);
@@ -163,16 +144,25 @@ public class OsgiSurefireBooter {
         return adapt.toURI().toURL();
     }
 
-    /**
-     * Converts a file URI to a {@link File}. Handles both standard hierarchical file URIs (e.g.
-     * {@code file:/path} or {@code file:///C:/path}) and Equinox-style opaque file URIs (e.g.
-     * {@code file:path} or {@code file:C:/path}).
-     */
-    private static File fileFromFileUri(URI fileUri) {
-        // Equinox generates non-standard file URIs (e.g. file:path without //).
-        // Use getSchemeSpecificPart() for opaque URIs, getPath() for hierarchical.
-        String path = fileUri.isOpaque() ? fileUri.getSchemeSpecificPart() : fileUri.getPath();
-        return new File(path);
+    private static File getInstallLocation() {
+        Location installLocation = Platform.getInstallLocation();
+        if (installLocation == null) {
+            throw new IllegalStateException("Cannot resolve relative bundle path: install location is not set");
+        }
+        URL installUrl = installLocation.getURL();
+        if (installUrl == null) {
+            throw new IllegalStateException(
+                    "Cannot resolve relative bundle path: install location URL is not available");
+        }
+        try {
+            File installDir = new File(installUrl.toURI());
+            if (!installDir.isDirectory()) {
+                throw new IllegalStateException("Configuration area does not exist: " + installUrl);
+            }
+            return installDir;
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException("Configuration area is malformed: " + installUrl);
+        }
     }
 
     public static int invokeSureFire(String[] args, Properties testProps) throws Exception {
