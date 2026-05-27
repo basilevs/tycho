@@ -14,7 +14,6 @@ package org.eclipse.tycho.buildversion;
 
 import java.io.File;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import javax.inject.Inject;
 
@@ -84,12 +83,11 @@ public abstract class AbstractVersionMojo extends AbstractMojo {
 		return "<unknown packaging=" + packaging + ">";
 	}
 
-	private static final Pattern INTERPOLATION_PATTERN = Pattern.compile("\\$\\{.+?\\}");
-
 	/**
 	 * Detects whether the project uses CI-friendly versions by checking if the raw
-	 * POM version (or the parent's version inherited by this project) contains any
-	 * Maven interpolation expressions (e.g. {@code ${revision}}).
+	 * POM version (from the original model) differs from the resolved project
+	 * version. A difference indicates that interpolation occurred, meaning the
+	 * version contains expressions (e.g. {@code ${revision}}).
 	 *
 	 * @return {@code true} if CI-friendly version expressions are detected
 	 */
@@ -98,15 +96,18 @@ public abstract class AbstractVersionMojo extends AbstractMojo {
 		if (originalModel == null) {
 			return false;
 		}
-		String version = originalModel.getVersion();
-		if (version == null) {
+		String rawVersion = originalModel.getVersion();
+		if (rawVersion == null) {
 			// Version may be inherited from parent
 			Parent parent = originalModel.getParent();
 			if (parent != null) {
-				version = parent.getVersion();
+				rawVersion = parent.getVersion();
 			}
 		}
-		return version != null && INTERPOLATION_PATTERN.matcher(version).find();
+		if (rawVersion == null) {
+			return false;
+		}
+		return !rawVersion.equals(project.getVersion());
 	}
 
 }
