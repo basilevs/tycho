@@ -165,7 +165,7 @@ public class BuildQualifierMojo extends AbstractVersionMojo {
 			throws MojoFailureException, MojoExecutionException {
 
         Version osgiVersion = getParsedOSGiVersion();
-        if (osgiVersion != null) {
+        if (osgiVersion != null && !isCiFriendlyVersion()) {
 
             if (!VersioningHelper.QUALIFIER.equals(osgiVersion.getQualifier())) {
                 // fully expended or absent qualified. nothing to expand
@@ -181,6 +181,13 @@ public class BuildQualifierMojo extends AbstractVersionMojo {
 		validateQualifier(forceContextQualifier, qualifier);
 
 		String pomOSGiVersion = getUnqualifiedVersion();
+
+		// For CI-friendly release versions (no -SNAPSHOT), produce an exact match
+		// with no qualifier appended
+		if (isCiFriendlyVersion() && !project.getArtifact().isSnapshot()) {
+			return new TychoProjectVersion(pomOSGiVersion, "");
+		}
+
 		String suffix = "." + qualifier;
 		if (pomOSGiVersion.endsWith(suffix)) {
 			return new TychoProjectVersion(pomOSGiVersion.substring(0, pomOSGiVersion.length() - suffix.length()),

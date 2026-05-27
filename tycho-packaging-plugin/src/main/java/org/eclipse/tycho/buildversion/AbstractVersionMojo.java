@@ -13,7 +13,10 @@
 package org.eclipse.tycho.buildversion;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import javax.inject.Inject;
 
@@ -79,6 +82,41 @@ public abstract class AbstractVersionMojo extends AbstractMojo {
 			return IU.SOURCE_FILE_NAME;
 		}
 		return "<unknown packaging=" + packaging + ">";
+	}
+
+	private static final Pattern INTERPOLATION_PATTERN = Pattern.compile("\\$\\{.+?\\}");
+
+	/**
+	 * Detects whether the project uses CI-friendly versions by checking if the raw
+	 * POM version (or the parent's version inherited by this project) contains any
+	 * Maven interpolation expressions (e.g. {@code ${revision}}).
+	 *
+	 * @return {@code true} if CI-friendly version expressions are detected
+	 */
+	protected boolean isCiFriendlyVersion() {
+		File pomFile = project.getFile();
+		if (pomFile == null || !pomFile.isFile()) {
+			return false;
+		}
+		try {
+			String pomContent = Files.readString(pomFile.toPath());
+			// Look for <version> elements containing ${...} expressions
+			// This matches both direct version and parent version references
+			int idx = 0;
+			while ((idx = pomContent.indexOf("<version>", idx)) >= 0) {
+				int end = pomContent.indexOf("</version>", idx);
+				if (end > idx) {
+					String versionContent = pomContent.substring(idx + "<version>".length(), end);
+					if (INTERPOLATION_PATTERN.matcher(versionContent).find()) {
+						return true;
+					}
+				}
+				idx++;
+			}
+		} catch (IOException e) {
+			// If we can't read the POM, assume no CI-friendly versions
+		}
+		return false;
 	}
 
 }

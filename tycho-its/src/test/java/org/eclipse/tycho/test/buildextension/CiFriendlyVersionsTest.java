@@ -159,6 +159,7 @@ public class CiFriendlyVersionsTest extends AbstractTychoIntegrationTest {
 	public void testValidateVersionOverriddenRevisionFeature() throws Exception {
 		Verifier verifier = getVerifier("ci-friendly/validateVersion", false);
 		verifier.addCliOption("-Drevision=0.0.7-SNAPSHOT");
+		verifier.addCliOption("-Dtycho.strictVersions=false");
 		verifier.addCliOption("-pl features/org.example.feature -am");
 		verifier.executeGoal("verify");
 		verifier.verifyErrorFreeLog();
@@ -176,6 +177,7 @@ public class CiFriendlyVersionsTest extends AbstractTychoIntegrationTest {
 	public void testValidateVersionOverriddenRevisionBundle() throws Exception {
 		Verifier verifier = getVerifier("ci-friendly/validateVersion", false);
 		verifier.addCliOption("-Drevision=0.0.7-SNAPSHOT");
+		verifier.addCliOption("-Dtycho.strictVersions=false");
 		verifier.addCliOption("-pl bundles/org.example.bundle -am");
 		verifier.executeGoal("verify");
 		verifier.verifyErrorFreeLog();
@@ -195,6 +197,7 @@ public class CiFriendlyVersionsTest extends AbstractTychoIntegrationTest {
 	public void testValidateVersionOverriddenRevisionFullReactor() throws Exception {
 		Verifier verifier = getVerifier("ci-friendly/validateVersion", false);
 		verifier.addCliOption("-Drevision=0.0.7-SNAPSHOT");
+		verifier.addCliOption("-Dtycho.strictVersions=false");
 		verifier.executeGoal("verify");
 		verifier.verifyErrorFreeLog();
 
@@ -215,5 +218,26 @@ public class CiFriendlyVersionsTest extends AbstractTychoIntegrationTest {
 		Feature builtFeature = Feature.readJar(featureJar.toFile());
 		assertTrue("Feature version should start with 0.0.7: " + builtFeature.getVersion(),
 				builtFeature.getVersion().startsWith("0.0.7."));
+	}
+
+	@Test
+	public void testValidateVersionOverriddenRevisionStrictVersions() throws Exception {
+		// Verify that CI-friendly versions work even with strictVersions=true (default)
+		// Maven version overrides OSGi metadata completely
+		Verifier verifier = getVerifier("ci-friendly/validateVersion", false);
+		verifier.addCliOption("-Drevision=0.0.7-SNAPSHOT");
+		verifier.executeGoal("verify");
+		verifier.verifyErrorFreeLog();
+
+		Path basedir = Path.of(verifier.getBasedir());
+
+		Path bundleJar = basedir
+				.resolve("bundles/org.example.bundle/target/org.example.bundle-0.0.7-SNAPSHOT.jar");
+		assertTrue("Bundle jar not found: " + bundleJar, Files.isRegularFile(bundleJar));
+		try (JarFile jar = new JarFile(bundleJar.toFile())) {
+			String bundleVersion = jar.getManifest().getMainAttributes().getValue(Constants.BUNDLE_VERSION);
+			assertTrue("Bundle-Version should start with 0.0.7: " + bundleVersion,
+					bundleVersion.startsWith("0.0.7."));
+		}
 	}
 }

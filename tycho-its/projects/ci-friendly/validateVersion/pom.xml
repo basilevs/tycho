@@ -14,8 +14,8 @@
 	</properties>
 
 	<modules>
-		<module>bundles</module>
-		<module>features</module>
+		<module>bundles/org.example.bundle</module>
+		<module>features/org.example.feature</module>
 	</modules>
 
 	<build>

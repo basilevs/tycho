@@ -67,6 +67,18 @@ public class ValidateVersionMojo extends AbstractVersionMojo {
 			return;
 		}
 
+		if (isCiFriendlyVersion()) {
+			// When CI-friendly versions are in use, Maven version is the source of truth.
+			// OSGi metadata (MANIFEST.MF/feature.xml) may contain a different version that
+			// should be completely ignored - the build will produce artifacts with the
+			// Maven-derived version regardless.
+			if (strictVersions) {
+				getLog().info("CI-friendly version detected (" + mavenVersion
+						+ "), OSGi metadata version (" + osgiVersion + ") will be overridden");
+			}
+			return;
+		}
+
 		if (project.getArtifact().isSnapshot() || osgiVersion.endsWith(VersioningHelper.QUALIFIER)) {
 			validateSnapshotVersion(mavenVersion, osgiVersion);
 		} else {
