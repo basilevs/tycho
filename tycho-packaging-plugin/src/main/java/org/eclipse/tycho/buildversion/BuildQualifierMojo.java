@@ -182,12 +182,6 @@ public class BuildQualifierMojo extends AbstractVersionMojo {
 
 		String pomOSGiVersion = getUnqualifiedVersion();
 
-		// For CI-friendly release versions (no -SNAPSHOT), produce an exact match
-		// with no qualifier appended
-		if (isCiFriendlyVersion() && !project.getArtifact().isSnapshot()) {
-			return new TychoProjectVersion(pomOSGiVersion, "");
-		}
-
 		String suffix = "." + qualifier;
 		if (pomOSGiVersion.endsWith(suffix)) {
 			return new TychoProjectVersion(pomOSGiVersion.substring(0, pomOSGiVersion.length() - suffix.length()),
