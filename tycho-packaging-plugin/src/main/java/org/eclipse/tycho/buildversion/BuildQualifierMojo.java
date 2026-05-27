@@ -181,7 +181,6 @@ public class BuildQualifierMojo extends AbstractVersionMojo {
 		validateQualifier(forceContextQualifier, qualifier);
 
 		String pomOSGiVersion = getUnqualifiedVersion();
-
 		String suffix = "." + qualifier;
 		if (pomOSGiVersion.endsWith(suffix)) {
 			return new TychoProjectVersion(pomOSGiVersion.substring(0, pomOSGiVersion.length() - suffix.length()),
